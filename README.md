@@ -10,21 +10,19 @@
 - Anthropic SDK (`claude-sonnet-4-6`)
 - Server-Sent Events 로 실시간 스트리밍
 
-## 빠른 시작 (로컬 전용)
+## 빠른 시작 — GitHub Codespaces (원클릭, 추천)
+
+1. 이 저장소 페이지에서 초록색 **Code** 버튼 → **Codespaces** 탭 → **Create codespace on main**
+2. 첫 부팅 시 `.devcontainer/setup.sh` 가 자동으로 `npm install` / DB 초기화 / 시드까지 수행
+3. 시크릿 등록: Codespace 좌측 하단 톱니 → **Command Palette** → `Codespaces: Manage User Secrets` → `ANTHROPIC_API_KEY` 추가 (또는 터미널에서 `.env.local` 직접 수정)
+4. 준비 완료되면 자동으로 `npm run dev` 가 실행되고 **포트 3000** 이 포워딩되어 브라우저에 미리보기가 열립니다. 하단 **PORTS** 탭에서 언제든 URL 확인 가능
+
+## 빠른 시작 — 로컬
 
 ```bash
-# 1. 의존성 설치
 npm install
-
-# 2. 환경 변수 설정
-cp .env.example .env.local
-# .env.local 열어서 ANTHROPIC_API_KEY 에 Claude API 키 입력
-
-# 3. DB 초기화 + 시드
-npm run db:push
-npm run db:seed
-
-# 4. 개발 서버
+cp .env.example .env.local   # ANTHROPIC_API_KEY 입력
+npm run db:push && npm run db:seed
 npm run dev
 ```
 

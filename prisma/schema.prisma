@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String       @id @default(cuid())
+  name        String
+  industry    String
+  createdAt   DateTime     @default(now())
+  departments Department[]
+  commands    Command[]
+}
+
+model Department {
+  id        String     @id @default(cuid())
+  name      String
+  icon      String
+  slug      String     @unique
+  order     Int        @default(0)
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employees Employee[]
+}
+
+model Employee {
+  id           String     @id @default(cuid())
+  name         String
+  title        String
+  rank         String
+  specialties  String     @default("")
+  style        String     @default("")
+  systemPrompt String
+  order        Int        @default(0)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  responses    Response[]
+}
+
+model Command {
+  id         String     @id @default(cuid())
+  content    String
+  priority   String     @default("normal")
+  deadline   DateTime?
+  pinned     Boolean    @default(false)
+  companyId  String
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  responses  Response[]
+  createdAt  DateTime   @default(now())
+}
+
+model Response {
+  id         String   @id @default(cuid())
+  content    String
+  status     String   @default("pending")
+  commandId  String
+  command    Command  @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  parentId   String?
+  parent     Response?  @relation("ResponseHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Response[] @relation("ResponseHierarchy")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

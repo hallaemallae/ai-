@@ -6,7 +6,7 @@
 
 - Next.js 14 (App Router) + TypeScript
 - Tailwind CSS
-- Prisma + SQLite (로컬) / PostgreSQL (배포)
+- Prisma + PostgreSQL (Neon / Supabase / Railway)
 - Anthropic SDK (`claude-sonnet-4-6`)
 - Server-Sent Events 로 실시간 스트리밍
 
@@ -18,15 +18,29 @@ npm install
 
 # 2. 환경 변수 설정
 cp .env.example .env.local
-# .env.local 열어 ANTHROPIC_API_KEY 를 입력
+# ANTHROPIC_API_KEY, DATABASE_URL(postgres) 입력
 
-# 3. DB 초기화 및 시드
+# 3. DB 스키마 적용 및 시드
 npm run db:push
 npm run db:seed
 
 # 4. 개발 서버
 npm run dev
 ```
+
+## 배포 (Vercel + Neon)
+
+1. **Neon** — https://neon.tech 에서 무료 Postgres 프로젝트 생성 → connection string 복사
+2. **GitHub** — 이 레포 그대로 Vercel 에 import
+3. **Vercel Environment Variables** 설정:
+   - `ANTHROPIC_API_KEY` — Claude API 키
+   - `DATABASE_URL` — Neon connection string (`?sslmode=require` 포함)
+4. Vercel 배포 완료 후, 로컬에서 Neon URL 로 한 번 스키마/시드 주입:
+   ```bash
+   DATABASE_URL="<neon-url>" npm run db:push
+   DATABASE_URL="<neon-url>" npm run db:seed
+   ```
+5. 배포 URL 확인 → 본인만 북마크하여 사용 (검색엔진은 `app/robots.ts` 로 차단됨)
 
 브라우저에서 `http://localhost:3000` 접속 → 대표 지시 입력 → 부서별 팀장/팀원 응답이 실시간으로 스트리밍됩니다.
 

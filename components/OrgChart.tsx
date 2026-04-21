@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Avatar } from "./Avatar";
 import { cn, RANK_STYLE } from "@/lib/utils";
 import type { DepartmentDTO } from "@/types";
 
@@ -14,9 +15,12 @@ export function OrgChart({
   return (
     <div className="space-y-8">
       <div className="flex justify-center">
-        <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-8 py-4 text-center text-white shadow-lg">
-          <div className="text-xs uppercase tracking-widest opacity-75">대표</div>
-          <div className="text-lg font-bold">{companyName}</div>
+        <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-6 py-3 text-white shadow-lg">
+          <Avatar name={companyName} rank="대표" size={56} className="border-white/40" />
+          <div className="text-left">
+            <div className="text-xs uppercase tracking-widest opacity-75">대표</div>
+            <div className="text-lg font-bold">{companyName}</div>
+          </div>
         </div>
       </div>
 
@@ -71,9 +75,7 @@ function EmployeeRow({
         isHead ? "border-brand-200 bg-brand-50/50" : "border-slate-100 bg-slate-50"
       )}
     >
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-brand-700 shadow-sm">
-        {employee.name.slice(0, 1)}
-      </div>
+      <Avatar name={employee.name} rank={employee.rank} size={isHead ? 44 : 36} />
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-800">{employee.name}</span>

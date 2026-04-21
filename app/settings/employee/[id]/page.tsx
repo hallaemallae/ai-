@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
 import { prisma } from "@/lib/db";
 import { EmployeeForm } from "./EmployeeForm";
 
@@ -23,13 +24,16 @@ export default async function EmployeeSettingsPage({
         ← 조직도
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          {employee.department.icon} {employee.department.name} · {employee.name}
-        </h1>
-        <p className="text-sm text-slate-500">
-          {employee.title} ({employee.rank})
-        </p>
+      <div className="flex items-center gap-4">
+        <Avatar name={employee.name} rank={employee.rank} size={72} />
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {employee.department.icon} {employee.department.name} · {employee.name}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {employee.title} ({employee.rank})
+          </p>
+        </div>
       </div>
 
       <EmployeeForm

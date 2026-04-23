@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DeptCard, type DeptResponseNode } from "./DeptCard";
+import { MeetingView, type MeetingPhase } from "./MeetingView";
+import type { ArtifactEntry } from "./ArtifactsPanel";
 import type { CommandDTO, DepartmentDTO, StreamEvent } from "@/types";
 
 interface Props {
   command: CommandDTO;
   departments: DepartmentDTO[];
   initialResponses: NonNullable<CommandDTO["responses"]>;
+  initialArtifacts?: ArtifactEntry[];
   autostartDepartmentSlugs?: string[] | null;
 }
 
@@ -19,11 +22,10 @@ function buildInitialNodes(
 ) {
   const byDept: Record<string, DeptResponseNode[]> = {};
   const nodeMap: NodeMap = {};
-
   for (const d of departments) byDept[d.slug] = [];
 
-  const heads = responses.filter((r) => r.parentId === null);
-  for (const head of heads) {
+  const roots = responses.filter((r) => r.parentId === null);
+  for (const head of roots) {
     const dept = head.employee?.department;
     if (!dept) continue;
     const node: DeptResponseNode = {
@@ -34,6 +36,7 @@ function buildInitialNodes(
       rank: head.employee?.rank ?? "부장",
       content: head.content,
       streaming: head.status === "streaming",
+      round: head.round ?? 0,
       children: [],
     };
     nodeMap[head.id] = node;
@@ -41,21 +44,30 @@ function buildInitialNodes(
     byDept[dept.slug].push(node);
   }
 
-  for (const member of responses.filter((r) => r.parentId !== null)) {
-    const parent = nodeMap[member.parentId!];
-    if (!parent) continue;
+  for (const r of responses.filter((x) => x.parentId !== null)) {
     const node: DeptResponseNode = {
-      id: member.id,
-      employeeId: member.employeeId,
-      employeeName: member.employee?.name ?? "",
-      title: member.employee?.title,
-      rank: member.employee?.rank ?? "사원",
-      content: member.content,
-      streaming: member.status === "streaming",
+      id: r.id,
+      employeeId: r.employeeId,
+      employeeName: r.employee?.name ?? "",
+      title: r.employee?.title,
+      rank: r.employee?.rank ?? "사원",
+      content: r.content,
+      streaming: r.status === "streaming",
+      round: r.round ?? 0,
       children: [],
     };
-    nodeMap[member.id] = node;
-    parent.children.push(node);
+    nodeMap[r.id] = node;
+    const parent = nodeMap[r.parentId!];
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      // Round-2 head whose round-1 parent isn't yet indexed — push to dept
+      const dept = r.employee?.department;
+      if (dept) {
+        if (!byDept[dept.slug]) byDept[dept.slug] = [];
+        byDept[dept.slug].push(node);
+      }
+    }
   }
 
   return { byDept, nodeMap };
@@ -65,8 +77,10 @@ export function CommandStreamView({
   command,
   departments,
   initialResponses,
+  initialArtifacts = [],
   autostartDepartmentSlugs,
 }: Props) {
+  const isMeeting = command.type === "meeting";
   const initial = useMemo(
     () => buildInitialNodes(departments, initialResponses),
     [departments, initialResponses]
@@ -76,6 +90,19 @@ export function CommandStreamView({
   const [streaming, setStreaming] = useState(false);
   const [activeTab, setActiveTab] = useState<string>(departments[0]?.slug ?? "");
   const startedRef = useRef(false);
+
+  const [summary, setSummary] = useState<string>(command.summary ?? "");
+  const [summaryStreaming, setSummaryStreaming] = useState(false);
+  const [artifacts, setArtifacts] = useState<ArtifactEntry[]>(initialArtifacts);
+  const [phase, setPhase] = useState<MeetingPhase["phase"]>(
+    initialResponses.length > 0 && isMeeting
+      ? command.summary
+        ? initialArtifacts.length > 0
+          ? "done"
+          : "artifacts"
+        : "round2"
+      : "idle"
+  );
 
   function updateNode(responseId: string, updater: (n: DeptResponseNode) => void) {
     const node = nodeMapRef.current[responseId];
@@ -88,6 +115,7 @@ export function CommandStreamView({
     if (startedRef.current) return;
     startedRef.current = true;
     setStreaming(true);
+    if (isMeeting) setPhase("round1");
 
     try {
       const res = await fetch("/api/ai/stream", {
@@ -126,6 +154,7 @@ export function CommandStreamView({
       console.error(err);
     } finally {
       setStreaming(false);
+      if (isMeeting) setPhase("done");
     }
   }
 
@@ -138,6 +167,7 @@ export function CommandStreamView({
         rank: event.rank,
         content: "",
         streaming: true,
+        round: event.round ?? 0,
         children: [],
       };
       nodeMapRef.current[event.responseId] = node;
@@ -150,8 +180,20 @@ export function CommandStreamView({
       } else {
         const parent = nodeMapRef.current[event.parentId];
         if (parent) {
-          parent.children.push(node);
-          setByDept((prev) => ({ ...prev }));
+          // In meeting mode, round-2 head with round-1 parent is still a peer of round-1,
+          // not a nested child. Promote to dept root.
+          if (isMeeting && event.round === 2) {
+            setByDept((prev) => ({
+              ...prev,
+              [event.departmentSlug]: [
+                ...(prev[event.departmentSlug] ?? []),
+                node,
+              ],
+            }));
+          } else {
+            parent.children.push(node);
+            setByDept((prev) => ({ ...prev }));
+          }
         }
       }
     } else if (event.type === "response:delta") {
@@ -162,6 +204,29 @@ export function CommandStreamView({
       updateNode(event.responseId, (n) => {
         n.streaming = false;
       });
+    } else if (event.type === "phase") {
+      if (event.phase === "round1" || event.phase === "round2" || event.phase === "ceo" || event.phase === "artifacts") {
+        setPhase(event.phase);
+      }
+    } else if (event.type === "summary:start") {
+      setSummary("");
+      setSummaryStreaming(true);
+    } else if (event.type === "summary:delta") {
+      setSummary((s) => s + event.delta);
+    } else if (event.type === "summary:end") {
+      setSummary(event.text);
+      setSummaryStreaming(false);
+    } else if (event.type === "artifact") {
+      setArtifacts((prev) => [
+        ...prev,
+        {
+          artifactId: event.artifactId,
+          filename: event.filename,
+          language: event.language,
+          departmentSlug: event.departmentSlug,
+          employeeName: event.employeeName,
+        },
+      ]);
     }
   }
 
@@ -172,8 +237,28 @@ export function CommandStreamView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (isMeeting) {
+    return (
+      <MeetingView
+        departments={departments}
+        byDept={byDept}
+        summary={summary}
+        summaryStreaming={summaryStreaming}
+        artifacts={artifacts}
+        phase={phase}
+        streaming={streaming}
+        onStart={() => void start()}
+        alreadyHasData={initialResponses.length > 0}
+      />
+    );
+  }
+
   const activeDepartments = departments.filter(
-    (d) => (byDept[d.slug] ?? []).length > 0 || !autostartDepartmentSlugs || autostartDepartmentSlugs.includes(d.slug) || autostartDepartmentSlugs.length === 0
+    (d) =>
+      (byDept[d.slug] ?? []).length > 0 ||
+      !autostartDepartmentSlugs ||
+      autostartDepartmentSlugs.includes(d.slug) ||
+      autostartDepartmentSlugs.length === 0
   );
 
   return (
@@ -229,15 +314,12 @@ export function CommandStreamView({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {(activeTab === "__all__" ? activeDepartments : activeDepartments.filter((d) => d.slug === activeTab)).map(
-          (d) => (
-            <DeptCard
-              key={d.id}
-              department={d}
-              headNodes={byDept[d.slug] ?? []}
-            />
-          )
-        )}
+        {(activeTab === "__all__"
+          ? activeDepartments
+          : activeDepartments.filter((d) => d.slug === activeTab)
+        ).map((d) => (
+          <DeptCard key={d.id} department={d} headNodes={byDept[d.slug] ?? []} />
+        ))}
       </div>
     </div>
   );

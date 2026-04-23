@@ -18,11 +18,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { content, priority = "normal", deadline, departmentSlugs } = body as {
+    const {
+      content,
+      priority = "normal",
+      deadline,
+      departmentSlugs,
+      type = "task",
+    } = body as {
       content: string;
       priority?: "urgent" | "normal" | "low";
       deadline?: string | null;
       departmentSlugs?: string[];
+      type?: "task" | "meeting";
     };
 
     if (!content || !content.trim()) {
@@ -40,6 +47,7 @@ export async function POST(req: NextRequest) {
     const command = await prisma.command.create({
       data: {
         content: content.trim(),
+        type,
         priority,
         deadline: deadline ? new Date(deadline) : null,
         companyId: company.id,

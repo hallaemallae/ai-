@@ -22,6 +22,7 @@ export default async function CommandDetailPage({ params, searchParams }: PagePr
           orderBy: { createdAt: "asc" },
           include: { employee: { include: { department: true } } },
         },
+        artifacts: { orderBy: { createdAt: "asc" } },
       },
     }),
     prisma.department.findMany({
@@ -39,14 +40,17 @@ export default async function CommandDetailPage({ params, searchParams }: PagePr
   const commandDto = {
     id: command.id,
     content: command.content,
+    type: (command.type ?? "task") as CommandDTO["type"],
     priority: command.priority as CommandDTO["priority"],
     deadline: command.deadline ? command.deadline.toISOString() : null,
     pinned: command.pinned,
+    summary: command.summary,
     createdAt: command.createdAt.toISOString(),
     responses: command.responses.map((r) => ({
       id: r.id,
       content: r.content,
       status: r.status,
+      round: r.round ?? 0,
       commandId: r.commandId,
       employeeId: r.employeeId,
       parentId: r.parentId,
@@ -123,6 +127,16 @@ export default async function CommandDetailPage({ params, searchParams }: PagePr
         command={commandDto}
         departments={deptDto}
         initialResponses={commandDto.responses ?? []}
+        initialArtifacts={command.artifacts.map((a) => ({
+          artifactId: a.id,
+          filename: a.filename,
+          language: a.language,
+          departmentSlug:
+            command.responses.find((r) => r.id === a.responseId)?.employee.department.slug ??
+            "",
+          employeeName:
+            command.responses.find((r) => r.id === a.responseId)?.employee.name ?? "",
+        }))}
         autostartDepartmentSlugs={autostart ? selectedSlugs : null}
       />
     </div>

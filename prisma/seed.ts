@@ -89,10 +89,42 @@ const DEPARTMENTS: DepartmentSeed[] = [
     ],
   },
   {
+    name: "디자인팀",
+    slug: "design",
+    icon: "🎨",
+    order: 3,
+    employees: [
+      {
+        name: "이현우",
+        title: "디자인팀장 (UX 리드)",
+        rank: "부장",
+        specialties: "UX 리서치,IA 설계,디자인 시스템,플랫폼 출시 경험",
+        style: "사용자 중심이며 디테일에 강한 리더. SVG 와이어프레임과 컴포넌트 스펙을 직접 쓴다",
+        order: 1,
+      },
+      {
+        name: "김도연",
+        title: "UI 디자이너",
+        rank: "대리",
+        specialties: "UI 컴포넌트,컬러/타이포 시스템,Figma→코드 전환",
+        style: "세련되고 실용적. 스펙을 SVG 또는 HTML 모킹으로 뽑아낸다",
+        order: 2,
+      },
+      {
+        name: "장민재",
+        title: "그래픽 디자이너",
+        rank: "사원",
+        specialties: "로고,일러스트,랜딩 히어로 이미지 브리프",
+        style: "톤앤매너를 일관되게 지키는 실행가",
+        order: 3,
+      },
+    ],
+  },
+  {
     name: "법무팀",
     slug: "legal",
     icon: "⚖️",
-    order: 3,
+    order: 4,
     employees: [
       {
         name: "정대한",
@@ -116,7 +148,7 @@ const DEPARTMENTS: DepartmentSeed[] = [
     name: "기획팀",
     slug: "planning",
     icon: "📋",
-    order: 4,
+    order: 5,
     employees: [
       {
         name: "강하늘",
@@ -148,7 +180,7 @@ const DEPARTMENTS: DepartmentSeed[] = [
     name: "재무팀",
     slug: "finance",
     icon: "💰",
-    order: 5,
+    order: 6,
     employees: [
       {
         name: "오재원",
@@ -173,6 +205,7 @@ const DEPARTMENTS: DepartmentSeed[] = [
 async function main() {
   console.log("🌱 Seeding...");
 
+  await prisma.artifact.deleteMany();
   await prisma.response.deleteMany();
   await prisma.command.deleteMany();
   await prisma.employee.deleteMany();

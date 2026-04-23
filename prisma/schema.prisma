@@ -44,12 +44,15 @@ model Employee {
 model Command {
   id         String     @id @default(cuid())
   content    String
+  type       String     @default("task")
   priority   String     @default("normal")
   deadline   DateTime?
   pinned     Boolean    @default(false)
+  summary    String?
   companyId  String
   company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   responses  Response[]
+  artifacts  Artifact[]
   createdAt  DateTime   @default(now())
 }
 
@@ -57,6 +60,7 @@ model Response {
   id         String   @id @default(cuid())
   content    String
   status     String   @default("pending")
+  round      Int      @default(0)
   commandId  String
   command    Command  @relation(fields: [commandId], references: [id], onDelete: Cascade)
   employeeId String
@@ -64,6 +68,19 @@ model Response {
   parentId   String?
   parent     Response?  @relation("ResponseHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children   Response[] @relation("ResponseHierarchy")
+  artifacts  Artifact[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Artifact {
+  id         String    @id @default(cuid())
+  filename   String
+  language   String    @default("text")
+  content    String
+  commandId  String
+  command    Command   @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  responseId String?
+  response   Response? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
 }

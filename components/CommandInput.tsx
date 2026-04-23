@@ -14,6 +14,7 @@ const PRIORITIES: { value: Priority; label: string; hint: string }[] = [
 export function CommandInput({ departments }: { departments: DepartmentDTO[] }) {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const [mode, setMode] = useState<"task" | "meeting">("task");
   const [priority, setPriority] = useState<Priority>("normal");
   const [deadline, setDeadline] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -40,9 +41,10 @@ export function CommandInput({ departments }: { departments: DepartmentDTO[] }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
+          type: mode,
           priority,
           deadline: deadline || null,
-          departmentSlugs: selected,
+          departmentSlugs: mode === "meeting" ? [] : selected,
         }),
       });
       const data = await res.json();
@@ -63,8 +65,41 @@ export function CommandInput({ departments }: { departments: DepartmentDTO[] }) 
       onSubmit={handleSubmit}
       className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
     >
+      <div className="mb-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("task")}
+          className={cn(
+            "flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition",
+            mode === "task"
+              ? "border-brand-500 bg-brand-50 text-brand-700"
+              : "border-slate-200 bg-white text-slate-500 hover:border-brand-300"
+          )}
+        >
+          📋 일반 지시
+          <div className="text-[11px] font-normal text-slate-500">
+            부장 → 팀원 순차 응답
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("meeting")}
+          className={cn(
+            "flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition",
+            mode === "meeting"
+              ? "border-brand-500 bg-brand-50 text-brand-700"
+              : "border-slate-200 bg-white text-slate-500 hover:border-brand-300"
+          )}
+        >
+          🧑‍💼 임원 회의
+          <div className="text-[11px] font-normal text-slate-500">
+            부장 2라운드 → 대표 결정 → 산출물 생성
+          </div>
+        </button>
+      </div>
+
       <label className="mb-2 block text-sm font-semibold text-slate-700">
-        대표 지시사항
+        {mode === "meeting" ? "회의 안건" : "대표 지시사항"}
       </label>
       <textarea
         value={content}
@@ -107,6 +142,7 @@ export function CommandInput({ departments }: { departments: DepartmentDTO[] }) 
         </div>
       </div>
 
+      {mode === "task" && (
       <div className="mt-4">
         <div className="mb-1 text-xs font-semibold text-slate-600">
           부서 선택 <span className="font-normal text-slate-400">(선택 없으면 전 부서)</span>
@@ -133,6 +169,15 @@ export function CommandInput({ departments }: { departments: DepartmentDTO[] }) 
           })}
         </div>
       </div>
+      )}
+
+      {mode === "meeting" && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+          회의 모드는 전 부장이 참석하여 2라운드 토론 → 대표이사 AI 의 최종 결정 →
+          각 팀원이 결정에 맞는 <b>산출물 파일</b>(md/ts/svg 등)을 생성합니다. 토큰
+          소비량이 일반 지시 대비 3-5배 높습니다.
+        </div>
+      )}
 
       {error && <div className="mt-3 text-xs text-red-600">{error}</div>}
 
@@ -142,7 +187,7 @@ export function CommandInput({ departments }: { departments: DepartmentDTO[] }) 
           disabled={submitting}
           className="rounded-xl bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {submitting ? "전달 중..." : "지시 전달"}
+          {submitting ? "전달 중..." : mode === "meeting" ? "회의 시작" : "지시 전달"}
         </button>
       </div>
     </form>

@@ -11,6 +11,7 @@ export interface DeptResponseNode {
   rank: string;
   content: string;
   streaming?: boolean;
+  round: number;
   children: DeptResponseNode[];
 }
 

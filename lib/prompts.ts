@@ -199,7 +199,49 @@ ${params.headResponse}
 `;
 }
 
-// ===== 회의록 생성 =====
+// ===== 자동 협업 판단 + 부장 조율 =====
+
+export function buildTriageSystemPrompt(): string {
+  return `당신은 회사 운영 코디네이터 AI 입니다.
+대표 지시를 보고 부서간 사전 조율(짧은 회의)이 필요한지 판단합니다.
+
+판단 기준:
+- 부서간 의견이 충돌·중복·의존할 가능성이 높은 안건 → 조율 필요
+- 단순 정보 조사·각자 영역 명확한 안건 → 조율 불필요
+
+출력 규칙: 반드시 첫 줄에 "YES" 또는 "NO" 만 출력. 두 번째 줄에 한 줄(50자 이내) 사유.
+다른 텍스트는 절대 출력 금지.`;
+}
+
+export function buildTriageContext(commandContent: string): string {
+  return `대표 지시: ${commandContent}\n\n조율 필요 여부 판단:`;
+}
+
+export function buildHeadAlignmentContext(params: {
+  commandContent: string;
+  selfDepartment: string;
+  selfInitial: string;
+  peerSummaries: { department: string; headName: string; initial: string }[];
+}): string {
+  const peers = params.peerSummaries
+    .map((p) => `- ${p.department} ${p.headName}: ${p.initial}`)
+    .join("\n");
+  return `[부서간 조율]
+대표 지시: ${params.commandContent}
+
+당신(${params.selfDepartment})의 1차 의견:
+${params.selfInitial}
+
+다른 부서 1차 의견:
+${peers}
+
+위를 참고해 당신의 의견을 **짧게 조율**하십시오.
+- 80-150자
+- 다른 부서와 충돌·중복되는 부분을 인지하고 조정
+- "조정안: ..." 한 줄로 마무리
+- 1차 의견을 통째로 반복하지 말 것`;
+}
+
 
 export function buildMeetingMinutesSystemPrompt(companyName: string): string {
   return `당신은 ${companyName}의 전문 경영 비서입니다.

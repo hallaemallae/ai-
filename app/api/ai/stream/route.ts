@@ -7,12 +7,15 @@ import {
   buildCeoSummarySystemPrompt,
   buildClaudeCodePromptContext,
   buildClaudeCodePromptSystemPrompt,
+  buildHeadAlignmentContext,
   buildMeetingMinutesContext,
   buildMeetingMinutesSystemPrompt,
   buildHeadContext,
   buildMeetingRound1Context,
   buildMeetingRound2Context,
   buildMemberContext,
+  buildTriageContext,
+  buildTriageSystemPrompt,
 } from "@/lib/prompts";
 import { extractArtifacts, safeFilename } from "@/lib/artifacts";
 import type { StreamEvent } from "@/types";
@@ -234,7 +237,64 @@ export async function POST(req: NextRequest) {
           })
         );
 
-        for (const result of headResults) {
+        // 자동 협업 판단: 부서간 조율 필요한가?
+        let needsAlignment = false;
+        if (headResults.filter(Boolean).length >= 2) {
+          try {
+            const anthropic = getAnthropic();
+            const triageMsg = await anthropic.messages.create({
+              model: CLAUDE_MODEL,
+              max_tokens: 50,
+              system: buildTriageSystemPrompt(),
+              messages: [{ role: "user", content: buildTriageContext(command.content) }],
+            });
+            const text = triageMsg.content
+              .map((b) => (b.type === "text" ? b.text : ""))
+              .join("")
+              .trim()
+              .toUpperCase();
+            needsAlignment = text.startsWith("YES");
+          } catch {
+            needsAlignment = false;
+          }
+        }
+
+        // 조율 라운드 (필요 시)
+        const alignedResults = await Promise.all(
+          headResults.map(async (self) => {
+            if (!self || !needsAlignment) return self;
+            const peers = headResults
+              .filter((x): x is NonNullable<typeof x> => Boolean(x))
+              .filter((x) => x.dept.id !== self.dept.id)
+              .map((x) => ({
+                department: x.dept.name,
+                headName: x.head.name,
+                initial: x.headText,
+              }));
+            const ctx = buildHeadAlignmentContext({
+              commandContent: command.content,
+              selfDepartment: self.dept.name,
+              selfInitial: self.headText,
+              peerSummaries: peers,
+            });
+            const { id: alignedId, text: alignedText } = await streamEmployeeResponse({
+              controller,
+              commandId,
+              employee: { ...self.head, department: { slug: self.dept.slug } },
+              userContext: ctx,
+              parentId: self.headResponseId,
+              round: 4,
+              maxTokens: 400,
+            });
+            return {
+              ...self,
+              headResponseId: alignedId,
+              headText: `${self.headText}\n\n[조정안]\n${alignedText}`,
+            };
+          })
+        );
+
+        for (const result of alignedResults) {
           if (!result) continue;
           const members = result.dept.employees.filter((e) => e.rank !== "부장");
           for (const member of members) {

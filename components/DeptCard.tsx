@@ -35,28 +35,46 @@ export function DeptCard({
         </div>
       ) : (
         <div className="space-y-3">
-          {headNodes.map((head) => (
-            <div key={head.id} className="space-y-2">
-              <EmployeeResponseView
-                employeeName={head.employeeName}
-                title={head.title}
-                rank={head.rank}
-                content={head.content}
-                streaming={head.streaming}
-              />
-              {head.children.map((child) => (
+          {headNodes.map((head) => {
+            const aligned = head.children.find((c) => c.round === 4);
+            const members = head.children.filter((c) => c.round !== 4);
+            return (
+              <div key={head.id} className="space-y-2">
                 <EmployeeResponseView
-                  key={child.id}
-                  employeeName={child.employeeName}
-                  title={child.title}
-                  rank={child.rank}
-                  content={child.content}
-                  streaming={child.streaming}
-                  depth={1}
+                  employeeName={head.employeeName}
+                  title={head.title}
+                  rank={head.rank}
+                  content={head.content}
+                  streaming={head.streaming}
                 />
-              ))}
-            </div>
-          ))}
+                {aligned && (
+                  <div className="ml-4 rounded-lg border border-amber-200 bg-amber-50/60 p-2">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      🤝 부서간 조율 후 조정안
+                    </div>
+                    <EmployeeResponseView
+                      employeeName={aligned.employeeName}
+                      title={aligned.title}
+                      rank={aligned.rank}
+                      content={aligned.content}
+                      streaming={aligned.streaming}
+                    />
+                  </div>
+                )}
+                {members.map((child) => (
+                  <EmployeeResponseView
+                    key={child.id}
+                    employeeName={child.employeeName}
+                    title={child.title}
+                    rank={child.rank}
+                    content={child.content}
+                    streaming={child.streaming}
+                    depth={1}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

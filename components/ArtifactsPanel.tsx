@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { DepartmentDTO } from "@/types";
 import type { DeptResponseNode } from "./DeptCard";
 import { EmployeeResponseView } from "./EmployeeResponse";
@@ -30,6 +31,54 @@ const LANG_ICON: Record<string, string> = {
   txt: "📄",
 };
 
+function CcPromptCard({ artifact }: { artifact: ArtifactEntry }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      const res = await fetch(`/api/artifact/${artifact.artifactId}`);
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // fallback: just open download
+      window.open(`/api/artifact/${artifact.artifactId}?download=1`);
+    }
+  }
+
+  return (
+    <div className="col-span-full rounded-2xl border-2 border-brand-400 bg-gradient-to-br from-brand-50 to-white p-4 shadow-md">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-xl">🤖</span>
+        <div>
+          <div className="text-sm font-bold text-brand-800">
+            Claude Code 구현 프롬프트
+          </div>
+          <div className="text-xs text-slate-500">
+            아래 버튼으로 복사 → Claude Code 에 붙여넣기하면 바로 구현 시작
+          </div>
+        </div>
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={handleCopy}
+            className="rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-bold text-white shadow transition hover:bg-brand-700 active:scale-95"
+          >
+            {copied ? "✓ 복사됨!" : "📋 복사"}
+          </button>
+          <a
+            href={`/api/artifact/${artifact.artifactId}?download=1`}
+            download={artifact.filename}
+            className="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-50"
+          >
+            ↓ 저장
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ArtifactsPanel({
   artifacts,
   byDept,
@@ -39,6 +88,13 @@ export function ArtifactsPanel({
   byDept: Record<string, DeptResponseNode[]>;
   departments: DepartmentDTO[];
 }) {
+  const ccPrompt = artifacts.find((a) => a.filename === "claude-code-prompt.md");
+  const minutes = artifacts.find((a) => a.filename === "meeting-minutes.md");
+  const rest = artifacts.filter(
+    (a) =>
+      a.filename !== "claude-code-prompt.md" && a.filename !== "meeting-minutes.md"
+  );
+
   return (
     <div>
       <h3 className="mb-3 text-sm font-bold text-slate-700">
@@ -51,7 +107,26 @@ export function ArtifactsPanel({
         </div>
       ) : (
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-          {artifacts.map((a) => (
+          {ccPrompt && <CcPromptCard artifact={ccPrompt} />}
+          {minutes && (
+            <div className="col-span-full flex items-center justify-between rounded-xl border border-slate-300 bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📋</span>
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">회의록</div>
+                  <div className="text-[11px] text-slate-500">meeting-minutes.md</div>
+                </div>
+              </div>
+              <a
+                href={`/api/artifact/${minutes.artifactId}?download=1`}
+                download="meeting-minutes.md"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand-400 hover:bg-brand-50"
+              >
+                ↓ 다운로드
+              </a>
+            </div>
+          )}
+          {rest.map((a) => (
             <a
               key={a.artifactId}
               href={`/api/artifact/${a.artifactId}?download=1`}

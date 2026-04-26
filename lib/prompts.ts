@@ -198,3 +198,141 @@ ${params.headResponse}
 - 지원되는 언어 태그: md, ts, tsx, js, html, css, svg, json, sql, txt
 `;
 }
+
+// ===== 회의록 생성 =====
+
+export function buildMeetingMinutesSystemPrompt(companyName: string): string {
+  return `당신은 ${companyName}의 전문 경영 비서입니다.
+임원 회의 내용을 받아 **공식 회의록**을 작성합니다.
+
+출력 규칙:
+- 반드시 아래 마크다운 구조를 지킬 것
+- 한국어, 격식체
+- 각 발언은 부서/이름 명시
+- 결정 사항과 액션 아이템은 명확히 분리
+
+\`\`\`md filename=meeting-minutes.md
+# 임원 회의록
+
+**일시**: [자동 입력]
+**안건**: [안건]
+**참석 부서**: [부서 목록]
+
+---
+
+## 1. 1라운드 — 각 부서 초기 입장
+[부서별 요약]
+
+## 2. 2라운드 — 부서간 조율
+[부서별 요약]
+
+## 3. 대표이사 최종 결정
+[결정 내용]
+
+## 4. 액션 아이템
+| 담당 부서 | 할 일 | 마감 |
+|---|---|---|
+| | | |
+
+## 5. 산출물 목록
+[생성된 파일 목록]
+\`\`\`
+`;
+}
+
+export function buildMeetingMinutesContext(params: {
+  agenda: string;
+  date: string;
+  departments: string[];
+  round1Entries: { department: string; headName: string; content: string }[];
+  round2Entries: { department: string; headName: string; content: string }[];
+  ceoDecision: string;
+}): string {
+  const r1 = params.round1Entries
+    .map((e) => `### ${e.department} — ${e.headName}\n${e.content}`)
+    .join("\n\n");
+  const r2 = params.round2Entries
+    .map((e) => `### ${e.department} — ${e.headName}\n${e.content}`)
+    .join("\n\n");
+
+  return `회의 정보:
+- 일시: ${params.date}
+- 안건: ${params.agenda}
+- 참석 부서: ${params.departments.join(", ")}
+
+1라운드 발언:
+${r1}
+
+2라운드 발언:
+${r2}
+
+대표이사 결정:
+${params.ceoDecision}
+
+위 내용으로 공식 회의록을 작성하십시오.`;
+}
+
+// ===== Claude Code 프롬프트 생성 =====
+
+export function buildClaudeCodePromptSystemPrompt(): string {
+  return `당신은 AI 스타트업의 수석 기술 아키텍트입니다.
+임원 회의 결과를 받아, Claude Code(AI 코딩 어시스턴트)가 즉시 실행할 수 있는
+**완전한 구현 프롬프트**를 작성하는 것이 유일한 역할입니다.
+
+출력 규칙:
+- 반드시 아래 마크다운 구조를 정확히 지킬 것
+- 한국어 설명 + 영어 코드/파일명 혼용 허용
+- Claude Code 가 질문 없이 바로 구현 시작할 수 있을 만큼 구체적으로
+- 불필요한 머리말·꼬리말 없이 프롬프트 본문만 출력
+
+\`\`\`md filename=claude-code-prompt.md
+# [기능명] 구현 요청
+
+## 프로젝트 컨텍스트
+[앱 설명, 기술 스택, 현재 구조]
+
+## 구현 목표
+[이번 Claude Code 세션에서 완성할 것]
+
+## 기술 스펙
+### 기술 스택
+### 파일 구조 (생성/수정할 파일 목록)
+### API 엔드포인트 (있으면)
+### 데이터 모델 (있으면)
+
+## UI/UX 요구사항
+[화면·컴포넌트 설명]
+
+## 완료 기준
+- [ ] 체크리스트 형태
+
+## 주의사항
+[특별히 지켜야 할 제약·패턴]
+\`\`\`
+`;
+}
+
+export function buildClaudeCodePromptContext(params: {
+  agenda: string;
+  ceoDecision: string;
+  departmentOutputs: { department: string; artifacts: string[] }[];
+}): string {
+  const deptSection = params.departmentOutputs
+    .map((d) => `### ${d.department}\n${d.artifacts.join("\n")}`)
+    .join("\n\n");
+
+  return `임원 회의 결과를 Claude Code 구현 프롬프트로 변환하십시오.
+
+## 회의 안건
+${params.agenda}
+
+## 대표이사 최종 결정
+${params.ceoDecision}
+
+## 각 부서 산출물 요약
+${deptSection}
+
+위 내용을 종합해 Claude Code 가 즉시 사용할 수 있는 구현 프롬프트를 생성하십시오.
+기술 스택이 명시되지 않았으면 Next.js 14 + TypeScript + Tailwind + Prisma 로 가정하십시오.`;
+}
+

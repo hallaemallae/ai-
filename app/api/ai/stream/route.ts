@@ -5,6 +5,10 @@ import {
   buildArtifactMemberContext,
   buildCeoSummaryContext,
   buildCeoSummarySystemPrompt,
+  buildClaudeCodePromptContext,
+  buildClaudeCodePromptSystemPrompt,
+  buildMeetingMinutesContext,
+  buildMeetingMinutesSystemPrompt,
   buildHeadContext,
   buildMeetingRound1Context,
   buildMeetingRound2Context,
@@ -337,6 +341,65 @@ export async function POST(req: NextRequest) {
         data: { summary: ceoText },
       });
 
+      // ===== 회의록 생성 =====
+      try {
+        const anthropic = getAnthropic();
+        const minutesCtx = buildMeetingMinutesContext({
+          agenda: command.content,
+          date: new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
+          departments: round2.map((r) => r.dept.name),
+          round1Entries: round1.map((r) => ({
+            department: r.dept.name,
+            headName: r.head.name,
+            content: r.r1Text,
+          })),
+          round2Entries: round2.map((r) => ({
+            department: r.dept.name,
+            headName: r.head.name,
+            content: r.r2Text,
+          })),
+          ceoDecision: ceoText,
+        });
+        const minutesStream = anthropic.messages.stream({
+          model: CLAUDE_MODEL,
+          max_tokens: 2000,
+          system: buildMeetingMinutesSystemPrompt(command.company.name),
+          messages: [{ role: "user", content: minutesCtx }],
+        });
+        let minutesText = "";
+        for await (const event of minutesStream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            minutesText += event.delta.text;
+          }
+        }
+        const minutesItems = extractArtifacts(minutesText, "meeting-minutes");
+        for (const item of minutesItems) {
+          const row = await prisma.artifact.create({
+            data: {
+              commandId,
+              filename: "meeting-minutes.md",
+              language: "md",
+              content: item.content,
+            },
+          });
+          controller.enqueue(
+            encodeSSE({
+              type: "artifact",
+              artifactId: row.id,
+              filename: row.filename,
+              language: row.language,
+              departmentSlug: "minutes",
+              employeeName: "회의록",
+            })
+          );
+        }
+      } catch {
+        // best-effort
+      }
+
       controller.enqueue(encodeSSE({ type: "phase", phase: "artifacts" }));
       // 각 부서 팀원(부장 제외) 이 대표 결정 기반 산출물 생성
       for (const r of round2) {
@@ -366,6 +429,57 @@ export async function POST(req: NextRequest) {
             text,
           });
         }
+      }
+
+      // ===== Claude Code 프롬프트 생성 =====
+      try {
+        const ccCtx = buildClaudeCodePromptContext({
+          agenda: command.content,
+          ceoDecision: ceoText,
+          departmentOutputs: round2.map((r) => ({
+            department: r.dept.name,
+            artifacts: [r.r2Text.slice(0, 400)],
+          })),
+        });
+        const anthropic = getAnthropic();
+        const ccStream = anthropic.messages.stream({
+          model: CLAUDE_MODEL,
+          max_tokens: 2000,
+          system: buildClaudeCodePromptSystemPrompt(),
+          messages: [{ role: "user", content: ccCtx }],
+        });
+        let ccText = "";
+        for await (const event of ccStream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            ccText += event.delta.text;
+          }
+        }
+        const ccArtifacts = extractArtifacts(ccText, "claude-code-prompt");
+        for (const item of ccArtifacts) {
+          const row = await prisma.artifact.create({
+            data: {
+              commandId,
+              filename: "claude-code-prompt.md",
+              language: "md",
+              content: item.content,
+            },
+          });
+          controller.enqueue(
+            encodeSSE({
+              type: "artifact",
+              artifactId: row.id,
+              filename: row.filename,
+              language: row.language,
+              departmentSlug: "cc-prompt",
+              employeeName: "Claude Code 프롬프트",
+            })
+          );
+        }
+      } catch {
+        // CC prompt generation is best-effort
       }
 
       controller.enqueue(encodeSSE({ type: "done" }));

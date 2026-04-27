@@ -30,7 +30,10 @@ export function EmployeeForm({ employee }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("저장 실패");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "저장 실패");
+      }
       setMessage("저장되었습니다.");
       router.refresh();
     } catch (err) {

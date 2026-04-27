@@ -77,8 +77,8 @@ async function streamEmployeeResponse(params: {
     const stream = anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: params.maxTokens ?? 1024,
-      system: employee.systemPrompt,
-      messages: [{ role: "user", content: userContext }],
+      ...(employee.systemPrompt?.trim() ? { system: employee.systemPrompt.trim() } : {}),
+      messages: [{ role: "user", content: userContext || "(내용 없음)" }],
     });
 
     for await (const event of stream) {

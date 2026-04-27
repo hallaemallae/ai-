@@ -16,6 +16,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
+
+  if (body.systemPrompt !== undefined && !body.systemPrompt.trim()) {
+    return NextResponse.json(
+      { error: "AI 역할 프롬프트는 비워 둘 수 없습니다." },
+      { status: 400 }
+    );
+  }
+
   const employee = await prisma.employee.update({
     where: { id: params.id },
     data: {
@@ -24,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       rank: body.rank,
       specialties: body.specialties,
       style: body.style,
-      systemPrompt: body.systemPrompt,
+      ...(body.systemPrompt?.trim() ? { systemPrompt: body.systemPrompt.trim() } : {}),
       order: body.order,
     },
   });

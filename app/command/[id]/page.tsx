@@ -14,28 +14,30 @@ interface PageProps {
 }
 
 export default async function CommandDetailPage({ params, searchParams }: PageProps) {
-  const [command, departments] = await Promise.all([
-    prisma.command.findUnique({
-      where: { id: params.id },
-      include: {
-        responses: {
-          orderBy: { createdAt: "asc" },
-          include: { employee: { include: { department: true } } },
-        },
-        artifacts: { orderBy: { createdAt: "asc" } },
+  const command = await prisma.command.findUnique({
+    where: { id: params.id },
+    include: {
+      company: true,
+      responses: {
+        orderBy: { createdAt: "asc" },
+        include: { employee: { include: { department: true } } },
       },
-    }),
-    prisma.department.findMany({
-      orderBy: { order: "asc" },
-      include: { employees: { orderBy: { order: "asc" } } },
-    }),
-  ]);
+      artifacts: { orderBy: { createdAt: "asc" } },
+    },
+  });
 
   if (!command) return notFound();
+
+  const departments = await prisma.department.findMany({
+    where: { companyId: command.companyId },
+    orderBy: { order: "asc" },
+    include: { employees: { orderBy: { order: "asc" } } },
+  });
 
   const selectedSlugs =
     searchParams.depts?.split(",").filter(Boolean) ?? [];
   const autostart = searchParams.autostart === "1";
+  const hasGithub = Boolean(command.company?.repoUrl && command.company?.githubToken);
 
   const commandDto = {
     id: command.id,
@@ -138,6 +140,8 @@ export default async function CommandDetailPage({ params, searchParams }: PagePr
             command.responses.find((r) => r.id === a.responseId)?.employee.name ?? "",
         }))}
         autostartDepartmentSlugs={autostart ? selectedSlugs : null}
+        companyId={command.companyId}
+        hasGithub={hasGithub}
       />
     </div>
   );

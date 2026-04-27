@@ -33,6 +33,9 @@ export function MeetingView({
   streaming,
   onStart,
   alreadyHasData,
+  commandId,
+  companyId,
+  hasGithub,
 }: {
   departments: DepartmentDTO[];
   byDept: Record<string, DeptResponseNode[]>;
@@ -43,6 +46,9 @@ export function MeetingView({
   streaming: boolean;
   onStart: () => void;
   alreadyHasData: boolean;
+  commandId?: string;
+  companyId?: string;
+  hasGithub?: boolean;
 }) {
   const [showRound1, setShowRound1] = useState(true);
 
@@ -176,7 +182,14 @@ export function MeetingView({
       )}
 
       {(artifacts.length > 0 || phase === "artifacts" || phase === "done") && (
-        <ArtifactsPanel artifacts={artifacts} byDept={byDept} departments={departments} />
+        <ArtifactsPanel
+          artifacts={artifacts}
+          byDept={byDept}
+          departments={departments}
+          commandId={commandId}
+          companyId={companyId}
+          hasGithub={hasGithub}
+        />
       )}
     </div>
   );

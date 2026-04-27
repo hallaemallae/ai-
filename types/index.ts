@@ -1,5 +1,13 @@
 export type Priority = "urgent" | "normal" | "low";
 
+export interface CompanyDTO {
+  id: string;
+  name: string;
+  industry: string;
+  repoUrl: string | null;
+  hasGithub: boolean;
+}
+
 export interface EmployeeDTO {
   id: string;
   name: string;

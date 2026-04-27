@@ -211,6 +211,7 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      try {
       controller.enqueue(encodeSSE({ type: "start", commandId, mode }));
 
       if (mode === "task") {
@@ -320,7 +321,7 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encodeSSE({ type: "done" }));
         controller.close();
         return;
-      }
+      } // end task mode
 
       // ===== 회의 모드 =====
       controller.enqueue(encodeSSE({ type: "phase", phase: "round1" }));
@@ -544,6 +545,12 @@ export async function POST(req: NextRequest) {
 
       controller.enqueue(encodeSSE({ type: "done" }));
       controller.close();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "AI 세션 오류가 발생했습니다.";
+        try { controller.enqueue(encodeSSE({ type: "error", message })); } catch { /* ignore */ }
+        try { controller.enqueue(encodeSSE({ type: "done" })); } catch { /* ignore */ }
+        try { controller.close(); } catch { /* ignore */ }
+      }
     },
   });
 

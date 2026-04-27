@@ -98,6 +98,7 @@ export function CommandStreamView({
   const [summary, setSummary] = useState<string>(command.summary ?? "");
   const [summaryStreaming, setSummaryStreaming] = useState(false);
   const [artifacts, setArtifacts] = useState<ArtifactEntry[]>(initialArtifacts);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [phase, setPhase] = useState<MeetingPhase["phase"]>(
     initialResponses.length > 0 && isMeeting
       ? command.summary
@@ -121,6 +122,7 @@ export function CommandStreamView({
     setStreaming(true);
     if (isMeeting) setPhase("round1");
 
+    setSessionError(null);
     try {
       const res = await fetch("/api/ai/stream", {
         method: "POST",
@@ -131,6 +133,10 @@ export function CommandStreamView({
         }),
       });
 
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `서버 오류 (${res.status})`);
+      }
       if (!res.body) throw new Error("스트림 응답을 받을 수 없습니다.");
 
       const reader = res.body.getReader();
@@ -156,6 +162,7 @@ export function CommandStreamView({
       }
     } catch (err) {
       console.error(err);
+      setSessionError(err instanceof Error ? err.message : "AI 세션 오류가 발생했습니다.");
     } finally {
       setStreaming(false);
       if (isMeeting) setPhase("done");
@@ -231,6 +238,8 @@ export function CommandStreamView({
           employeeName: event.employeeName,
         },
       ]);
+    } else if (event.type === "error") {
+      setSessionError(event.message);
     }
   }
 
@@ -241,22 +250,31 @@ export function CommandStreamView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const errorBanner = sessionError ? (
+    <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <strong>오류:</strong> {sessionError}
+    </div>
+  ) : null;
+
   if (isMeeting) {
     return (
-      <MeetingView
-        departments={departments}
-        byDept={byDept}
-        summary={summary}
-        summaryStreaming={summaryStreaming}
-        artifacts={artifacts}
-        phase={phase}
-        streaming={streaming}
-        onStart={() => void start()}
-        alreadyHasData={initialResponses.length > 0}
-        commandId={command.id}
-        companyId={companyId}
-        hasGithub={hasGithub}
-      />
+      <>
+        {errorBanner}
+        <MeetingView
+          departments={departments}
+          byDept={byDept}
+          summary={summary}
+          summaryStreaming={summaryStreaming}
+          artifacts={artifacts}
+          phase={phase}
+          streaming={streaming}
+          onStart={() => void start()}
+          alreadyHasData={initialResponses.length > 0}
+          commandId={command.id}
+          companyId={companyId}
+          hasGithub={hasGithub}
+        />
+      </>
     );
   }
 
@@ -270,6 +288,7 @@ export function CommandStreamView({
 
   return (
     <div>
+      {errorBanner}
       <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {departments.map((d) => {
           const count = (byDept[d.slug] ?? []).length;

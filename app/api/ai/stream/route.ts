@@ -71,14 +71,19 @@ async function streamEmployeeResponse(params: {
     })
   );
 
+  const systemPrompt =
+    employee.systemPrompt?.trim() ||
+    `당신은 회사 직원 ${employee.name}(${employee.rank})입니다. 주어진 지시에 성실하게 응답하십시오.`;
+  const messageContent = userContext?.trim() || "(지시 내용 없음)";
+
   let fullText = "";
   try {
     const anthropic = getAnthropic();
     const stream = anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: params.maxTokens ?? 1024,
-      ...(employee.systemPrompt?.trim() ? { system: employee.systemPrompt.trim() } : {}),
-      messages: [{ role: "user", content: userContext || "(내용 없음)" }],
+      system: systemPrompt,
+      messages: [{ role: "user", content: messageContent }],
     });
 
     for await (const event of stream) {
@@ -95,6 +100,7 @@ async function streamEmployeeResponse(params: {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI 응답 실패";
+    console.error(`[AI Stream] employee=${employee.name}(${employee.id}) systemPrompt.length=${systemPrompt.length} content.length=${messageContent.length} error:`, message);
     fullText = fullText || `⚠️ AI 응답 생성 중 오류가 발생했습니다: ${message}`;
     controller.enqueue(encodeSSE({ type: "error", message }));
   }
@@ -117,19 +123,16 @@ async function streamCeoSummary(params: {
   const { controller, companyName, commandContent, round2Entries } = params;
 
   controller.enqueue(encodeSSE({ type: "summary:start" }));
+  const ceoSystem = buildCeoSummarySystemPrompt(companyName).trim() || "당신은 대표이사 AI입니다.";
+  const ceoContent = buildCeoSummaryContext({ commandContent, round2Entries }).trim() || "(내용 없음)";
   let fullText = "";
   try {
     const anthropic = getAnthropic();
     const stream = anthropic.messages.stream({
       model: CLAUDE_MODEL,
       max_tokens: 1600,
-      system: buildCeoSummarySystemPrompt(companyName),
-      messages: [
-        {
-          role: "user",
-          content: buildCeoSummaryContext({ commandContent, round2Entries }),
-        },
-      ],
+      system: ceoSystem,
+      messages: [{ role: "user", content: ceoContent }],
     });
     for await (const event of stream) {
       if (
@@ -143,6 +146,7 @@ async function streamCeoSummary(params: {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "대표 요약 실패";
+    console.error(`[AI Stream] CEO summary error. system.length=${ceoSystem.length} content.length=${ceoContent.length}:`, message);
     fullText = fullText || `⚠️ 대표 요약 중 오류: ${message}`;
     controller.enqueue(encodeSSE({ type: "error", message }));
   }
@@ -246,8 +250,8 @@ export async function POST(req: NextRequest) {
             const triageMsg = await anthropic.messages.create({
               model: CLAUDE_MODEL,
               max_tokens: 50,
-              system: buildTriageSystemPrompt(),
-              messages: [{ role: "user", content: buildTriageContext(command.content) }],
+              system: buildTriageSystemPrompt().trim() || "판단하십시오.",
+              messages: [{ role: "user", content: buildTriageContext(command.content).trim() || "(내용 없음)" }],
             });
             const text = triageMsg.content
               .map((b) => (b.type === "text" ? b.text : ""))

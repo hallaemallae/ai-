@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { OrgChart } from "@/components/OrgChart";
 import type { DepartmentDTO } from "@/types";
@@ -5,13 +6,11 @@ import type { DepartmentDTO } from "@/types";
 export const dynamic = "force-dynamic";
 
 export default async function OrgPage() {
-  const [company, departments] = await Promise.all([
-    prisma.company.findFirst(),
-    prisma.department.findMany({
-      orderBy: { order: "asc" },
-      include: { employees: { orderBy: { order: "asc" } } },
-    }),
-  ]);
+  const cookieStore = cookies();
+  const savedId = cookieStore.get("activeProjectId")?.value;
+
+  const allCompanies = await prisma.company.findMany({ orderBy: { createdAt: "asc" } });
+  const company = allCompanies.find((c) => c.id === savedId) ?? allCompanies[0];
 
   if (!company) {
     return (
@@ -20,6 +19,12 @@ export default async function OrgPage() {
       </div>
     );
   }
+
+  const departments = await prisma.department.findMany({
+    where: { companyId: company.id },
+    orderBy: { order: "asc" },
+    include: { employees: { orderBy: { order: "asc" } } },
+  });
 
   const dto: DepartmentDTO[] = departments.map((d) => ({
     id: d.id,
@@ -43,7 +48,7 @@ export default async function OrgPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">조직도</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{company.name} 조직도</h1>
         <p className="text-sm text-slate-500">
           각 직원 카드를 클릭해 역할 프롬프트를 편집할 수 있습니다.
         </p>

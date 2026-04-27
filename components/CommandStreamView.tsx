@@ -12,6 +12,8 @@ interface Props {
   initialResponses: NonNullable<CommandDTO["responses"]>;
   initialArtifacts?: ArtifactEntry[];
   autostartDepartmentSlugs?: string[] | null;
+  companyId?: string;
+  hasGithub?: boolean;
 }
 
 type NodeMap = Record<string, DeptResponseNode>;
@@ -79,6 +81,8 @@ export function CommandStreamView({
   initialResponses,
   initialArtifacts = [],
   autostartDepartmentSlugs,
+  companyId,
+  hasGithub,
 }: Props) {
   const isMeeting = command.type === "meeting";
   const initial = useMemo(
@@ -249,6 +253,9 @@ export function CommandStreamView({
         streaming={streaming}
         onStart={() => void start()}
         alreadyHasData={initialResponses.length > 0}
+        commandId={command.id}
+        companyId={companyId}
+        hasGithub={hasGithub}
       />
     );
   }

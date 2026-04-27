@@ -8,23 +8,27 @@ datasource db {
 }
 
 model Company {
-  id          String       @id @default(cuid())
-  name        String
-  industry    String
-  createdAt   DateTime     @default(now())
-  departments Department[]
-  commands    Command[]
+  id           String       @id @default(cuid())
+  name         String
+  industry     String
+  repoUrl      String?
+  githubToken  String?
+  createdAt    DateTime     @default(now())
+  departments  Department[]
+  commands     Command[]
 }
 
 model Department {
   id        String     @id @default(cuid())
   name      String
   icon      String
-  slug      String     @unique
+  slug      String
   order     Int        @default(0)
   companyId String
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employees Employee[]
+
+  @@unique([companyId, slug])
 }
 
 model Employee {

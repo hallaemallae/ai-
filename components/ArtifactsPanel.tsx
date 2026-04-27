@@ -42,7 +42,6 @@ function CcPromptCard({ artifact }: { artifact: ArtifactEntry }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // fallback: just open download
       window.open(`/api/artifact/${artifact.artifactId}?download=1`);
     }
   }
@@ -79,14 +78,79 @@ function CcPromptCard({ artifact }: { artifact: ArtifactEntry }) {
   );
 }
 
+function GithubPushButton({
+  companyId,
+  commandId,
+}: {
+  companyId: string;
+  commandId: string;
+}) {
+  const [status, setStatus] = useState<"idle" | "pushing" | "done" | "error">("idle");
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  async function handlePush() {
+    setStatus("pushing");
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/project/${companyId}/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commandId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "푸시 실패");
+      setPrUrl(data.prUrl);
+      setStatus("done");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "알 수 없는 오류");
+      setStatus("error");
+    }
+  }
+
+  if (status === "done" && prUrl) {
+    return (
+      <a
+        href={prUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 transition hover:bg-green-100"
+      >
+        ✓ PR 생성됨 — 보기 →
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={handlePush}
+        disabled={status === "pushing"}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-brand-400 hover:bg-brand-50 disabled:opacity-60"
+      >
+        {status === "pushing" ? "푸시 중..." : "🐙 GitHub PR로 내보내기"}
+      </button>
+      {status === "error" && errorMsg && (
+        <span className="text-xs text-red-500">{errorMsg}</span>
+      )}
+    </div>
+  );
+}
+
 export function ArtifactsPanel({
   artifacts,
   byDept,
   departments,
+  companyId,
+  commandId,
+  hasGithub,
 }: {
   artifacts: ArtifactEntry[];
   byDept: Record<string, DeptResponseNode[]>;
   departments: DepartmentDTO[];
+  companyId?: string;
+  commandId?: string;
+  hasGithub?: boolean;
 }) {
   const ccPrompt = artifacts.find((a) => a.filename === "claude-code-prompt.md");
   const minutes = artifacts.find((a) => a.filename === "meeting-minutes.md");
@@ -97,9 +161,14 @@ export function ArtifactsPanel({
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-bold text-slate-700">
-        📦 산출물 (다운로드 가능)
-      </h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-slate-700">
+          📦 산출물 (다운로드 가능)
+        </h3>
+        {hasGithub && companyId && commandId && artifacts.length > 0 && (
+          <GithubPushButton companyId={companyId} commandId={commandId} />
+        )}
+      </div>
 
       {artifacts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-400">

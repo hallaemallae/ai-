@@ -203,8 +203,8 @@ export async function POST(req: NextRequest) {
   const departments = await prisma.department.findMany({
     where:
       departmentSlugs && departmentSlugs.length > 0
-        ? { slug: { in: departmentSlugs } }
-        : undefined,
+        ? { companyId: command.companyId, slug: { in: departmentSlugs } }
+        : { companyId: command.companyId },
     orderBy: { order: "asc" },
     include: { employees: { orderBy: { order: "asc" } } },
   });

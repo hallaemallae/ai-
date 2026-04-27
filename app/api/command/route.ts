@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const cookieStore = cookies();
+  const savedId = cookieStore.get("activeProjectId")?.value;
+  const allCompanies = await prisma.company.findMany({ orderBy: { createdAt: "asc" } });
+  const company = allCompanies.find((c) => c.id === savedId) ?? allCompanies[0];
+
   const commands = await prisma.command.findMany({
+    where: company ? { companyId: company.id } : undefined,
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     include: {
       responses: {
@@ -36,7 +43,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "지시 내용을 입력해 주십시오." }, { status: 400 });
     }
 
-    const company = await prisma.company.findFirst();
+    const cookieStore = cookies();
+    const savedId = cookieStore.get("activeProjectId")?.value;
+    const allCompanies = await prisma.company.findMany({ orderBy: { createdAt: "asc" } });
+    const company = allCompanies.find((c) => c.id === savedId) ?? allCompanies[0];
+
     if (!company) {
       return NextResponse.json(
         { error: "회사 데이터가 없습니다. 먼저 seed를 실행해 주십시오." },

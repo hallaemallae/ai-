@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { CommandInput } from "@/components/CommandInput";
 import { PriorityBadge } from "@/components/PriorityBadge";
@@ -6,13 +7,38 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [company, departments, commands] = await Promise.all([
-    prisma.company.findFirst(),
+  const cookieStore = cookies();
+  const savedId = cookieStore.get("activeProjectId")?.value;
+
+  const [allCompanies, commands] = await Promise.all([
+    prisma.company.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.command.findMany({ take: 0 }), // placeholder
+  ]);
+
+  const company =
+    allCompanies.find((c) => c.id === savedId) ?? allCompanies[0];
+
+  if (!company) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <h2 className="text-lg font-bold text-slate-800">회사 데이터가 없습니다</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          터미널에서{" "}
+          <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run db:seed</code>를
+          실행해 초기 조직 데이터를 생성해 주십시오.
+        </p>
+      </div>
+    );
+  }
+
+  const [departments, recentCommands] = await Promise.all([
     prisma.department.findMany({
+      where: { companyId: company.id },
       orderBy: { order: "asc" },
       include: { employees: { orderBy: { order: "asc" } } },
     }),
     prisma.command.findMany({
+      where: { companyId: company.id },
       orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
       take: 10,
       include: {
@@ -22,18 +48,6 @@ export default async function DashboardPage() {
       },
     }),
   ]);
-
-  if (!company) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-        <h2 className="text-lg font-bold text-slate-800">회사 데이터가 없습니다</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          터미널에서 <code className="rounded bg-slate-100 px-1.5 py-0.5">npm run db:seed</code>{" "}
-          를 실행해 초기 조직 데이터를 생성해 주십시오.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
@@ -59,13 +73,13 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {commands.length === 0 ? (
+        {recentCommands.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
             아직 등록된 지시가 없습니다. 위에서 첫 지시를 작성해 보십시오.
           </div>
         ) : (
           <ul className="space-y-2">
-            {commands.map((c) => {
+            {recentCommands.map((c) => {
               const deptSet = new Set(
                 c.responses.map((r) => r.employee.department.name)
               );
